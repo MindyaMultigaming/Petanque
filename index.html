@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestionnaire Pétanque</title>
+
+  <style>
+    :root {
+      --sand: #f4d58d;
+      --sand-dark: #d9b46f;
+      --green: #31572c;
+      --green-light: #4f772d;
+      --olive: #90a955;
+      --blue: #1d3557;
+      --white: #fffaf0;
+      --red: #b23a48;
+      --shadow: rgba(0, 0, 0, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: #2b2b2b;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.25), transparent 20%),
+        radial-gradient(circle at 80% 10%, rgba(255,255,255,0.2), transparent 18%),
+        linear-gradient(135deg, #e7c27c, #f7e1aa 45%, #d7b16a);
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--green), var(--green-light));
+      color: white;
+      padding: 24px;
+      text-align: center;
+      box-shadow: 0 4px 12px var(--shadow);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 2.2rem;
+    }
+
+    header p {
+      margin: 8px 0 0;
+      opacity: 0.9;
+    }
+
+    .container {
+      width: min(1200px, 94%);
+      margin: 24px auto;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 24px;
+    }
+
+    .panel {
+      background: rgba(255, 250, 240, 0.95);
+      border: 2px solid rgba(90, 70, 30, 0.2);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 8px 20px var(--shadow);
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      color: var(--green);
+      border-bottom: 2px dashed var(--sand-dark);
+      padding-bottom: 8px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 12px;
+      margin-bottom: 5px;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #c9b27a;
+      font-size: 1rem;
+    }
+
+    input, select {
+      background: #fffef8;
+    }
+
+    button {
+      background: var(--green-light);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      transition: 0.15s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: var(--green);
+    }
+
+    button.secondary {
+      background: var(--blue);
+    }
+
+    button.danger {
+      background: var(--red);
+    }
+
+    button.small {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    .participant-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .participant {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff3cf;
+      border: 1px solid #e1c070;
+      padding: 8px 10px;
+      border-radius: 10px;
+    }
+
+    .status-box {
+      background: #fff3cf;
+      border-left: 5px solid var(--green-light);
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .teams-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .team-card {
+      background: #fff6d9;
+      border: 2px solid #d2a94f;
+      border-radius: 14px;
+      padding: 12px;
+      position: relative;
+    }
+
+    .team-card::before {
+      content: "⚪";
+      position: absolute;
+      right: 12px;
+      top: 10px;
+      font-size: 1.4rem;
+    }
+
+    .team-card strong {
+      color: var(--green);
+    }
+
+    .matches {
+      display: grid;
+      gap: 14px;
+    }
+
+    .match-card {
+      background: white;
+      border: 2px solid #d8c08a;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    }
+
+    .match-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+      color: var(--blue);
+      font-weight: bold;
+    }
+
+    .score-row {
+      display: grid;
+      grid-template-columns: 1fr 80px;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .score-row input {
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .winner {
+      background: #e5f2d0;
+      border-color: var(--green-light);
+    }
+
+    .loser {
+      opacity: 0.65;
+    }
+
+    .bracket {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+    }
+
+    .round {
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .round h3 {
+      background: var(--green);
+      color: white;
+      border-radius: 12px;
+      padding: 10px;
+      text-align: center;
+      margin: 0;
+    }
+
+    .empty {
+      color: #766;
+      font-style: italic;
+      padding: 12px;
+    }
+
+    .footer-note {
+      font-size: 0.9rem;
+      opacity: 0.75;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🏆 Gestionnaire de Pétanque</h1>
+    <p>Inscriptions, équipes, matchs chill ou tournoi, scores et progression automatique.</p>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <h2>Configuration</h2>
+
+      <label for="playerName">Ajouter un participant</label>
+      <input id="playerName" type="text" placeholder="Ex: Roxana" />
+      <button onclick="addParticipant()">Ajouter</button>
+
+      <div class="participant-list" id="participantList"></div>
+
+      <label for="mode">Mode</label>
+      <select id="mode">
+        <option value="chill">Match chill</option>
+        <option value="tournament">Tournoi élimination directe</option>
+      </select>
+
+      <label for="startTime">Heure de début</label>
+      <input id="startTime" type="time" value="18:00" />
+
+      <label for="endTime">Heure de fin</label>
+      <input id="endTime" type="time" value="20:00" />
+
+      <label for="matchDuration">Durée estimée d’un match</label>
+      <input id="matchDuration" type="number" min="5" value="20" />
+
+      <label for="teamSize">Taille des équipes</label>
+      <select id="teamSize">
+        <option value="2">Doublette - 2 joueurs</option>
+        <option value="3">Triplette - 3 joueurs</option>
+      </select>
+
+      <button class="secondary" onclick="generateActivity()">Générer l’activité</button>
+      <button class="danger" onclick="resetAll()">Tout réinitialiser</button>
+
+      <p class="footer-note">
+        Conseil : en pétanque, le mode chill est pratique pour une soirée courte.
+        Le tournoi fonctionne mieux avec 4, 8 ou 16 équipes.
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>Terrain de jeu</h2>
+
+      <div class="status-box" id="statusBox">
+        Ajoute des participants, choisis le mode, puis génère l’activité.
+      </div>
+
+      <h2>Équipes</h2>
+      <div class="teams-grid" id="teamsGrid">
+        <div class="empty">Aucune équipe générée.</div>
+      </div>
+
+      <h2 id="matchesTitle">Matchs</h2>
+      <div id="matchesArea">
+        <div class="empty">Aucun match généré.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let participants = [];
+    let teams = [];
+    let chillMatches = [];
+    let bracketRounds = [];
+
+    function addParticipant() {
+      const input = document.getElementById("playerName");
+      const name = input.value.trim();
+
+      if (!name) return alert("Entre un nom.");
+      if (participants.includes(name)) return alert("Ce participant existe déjà.");
+
+      participants.push(name);
+      input.value = "";
+      renderParticipants();
+    }
+
+    function removeParticipant(name) {
+      participants = participants.filter(p => p !== name);
+      renderParticipants();
+    }
+
+    function renderParticipants() {
+      const list = document.getElementById("participantList");
+      list.innerHTML = "";
+
+      if (participants.length === 0) {
+        list.innerHTML = `<div class="empty">Aucun participant.</div>`;
+        return;
+      }
+
+      participants.forEach(name => {
+        const div = document.createElement("div");
+        div.className = "participant";
+        div.innerHTML = `
+          <span>👤 ${name}</span>
+          <button class="small danger" onclick="removeParticipant('${escapeQuotes(name)}')">X</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function escapeQuotes(text) {
+      return text.replace(/'/g, "\\'");
+    }
+
+    function shuffle(array) {
+      return [...array].sort(() => Math.random() - 0.5);
+    }
+
+    function generateTeams() {
+      const teamSize = Number(document.getElementById("teamSize").value);
+      const shuffled = shuffle(participants);
+
+      const generatedTeams = [];
+      let index = 0;
+
+      while (index < shuffled.length) {
+        const members = shuffled.slice(index, index + teamSize);
+        generatedTeams.push({
+          id: crypto.randomUUID(),
+          name: `Équipe ${generatedTeams.length + 1}`,
+          members
+        });
+        index += teamSize;
+      }
+
+      return generatedTeams;
+    }
+
+    function renderTeams() {
+      const grid = document.getElementById("teamsGrid");
+      grid.innerHTML = "";
+
+      if (teams.length === 0) {
+        grid.innerHTML = `<div class="empty">Aucune équipe générée.</div>`;
+        return;
+      }
+
+      teams.forEach(team => {
+        const div = document.createElement("div");
+        div.className = "team-card";
+        div.innerHTML = `
+          <strong>${team.name}</strong>
+          <div>${team.members.join(" / ")}</div>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    function generateActivity() {
+      if (participants.length < 4) {
+        alert("Il faut au minimum 4 participants pour générer des équipes intéressantes.");
+        return;
+      }
+
+      teams = generateTeams();
+      renderTeams();
+
+      const mode = document.getElementById("mode").value;
+
+      if (mode === "chill") {
+        generateChillMatches();
+      } else {
+        generateTournament();
+      }
+    }
+
+    function getTimeSlots(matchCount) {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      const duration = Number(document.getElementById("matchDuration").value);
+
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+
+      let current = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const slots = [];
+
+      for (let i = 0; i < matchCount; i++) {
+        if (current + duration <= endMin) {
+          slots.push(formatMinutes(current));
+          current += duration;
+        } else {
+          slots.push("Hors plage");
+        }
+      }
+
+      return slots;
+    }
+
+    function formatMinutes(total) {
+      const h = Math.floor(total / 60).toString().padStart(2, "0");
+      const m = (total % 60).toString().padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    function generateChillMatches() {
+      chillMatches = [];
+
+      const slots = [];
+      for (let i = 0; i < teams.length; i++) {
+        for (let j = i + 1; j < teams.length; j++) {
+          slots.push([teams[i], teams[j]]);
+        }
+      }
+
+      const timeSlots = getTimeSlots(slots.length);
+
+      chillMatches = slots.map((pair, index) => ({
+        id: crypto.randomUUID(),
+        round: "Match chill",
+        time: timeSlots[index],
+        teamA: pair[0],
+        teamB: pair[1],
+        scoreA: "",
+        scoreB: "",
+        winnerId: null
+      }));
+
+      document.getElementById("matchesTitle").innerText = "Matchs chill";
+      renderChillMatches();
+      updateStatus(`Mode chill généré : ${chillMatches.length} match(s) à jouer.`);
+    }
+
+    function renderChillMatches() {
+      const area = document.getElementById("matchesArea");
+      area.innerHTML = `<div class="matches"></div>`;
+
+      const list = area.querySelector(".matches");
+
+      chillMatches.forEach(match => {
+        const card = createMatchCard(match, "chill");
+        list.appendChild(card);
+      });
+    }
+
+    function nextPowerOfTwo(n) {
+      let power = 1;
+      while (power < n) power *= 2;
+      return power;
+    }
+
+    function generateTournament() {
+      const shuffledTeams = shuffle(teams);
+      const bracketSize = nextPowerOfTwo(shuffledTeams.length);
+      const paddedTeams = [...shuffledTeams];
+
+      while (paddedTeams.length < bracketSize) {
+        paddedTeams.push(null);
+      }
+
+      bracketRounds = [];
+
+      const firstRound = [];
+      const timeSlots = getTimeSlots(bracketSize - 1);
+      let timeIndex = 0;
+
+      for (let i = 0; i < paddedTeams.length; i += 2) {
+        const teamA = paddedTeams[i];
+        const teamB = paddedTeams[i + 1];
+
+        const match = {
+          id: crypto.randomUUID(),
+          roundIndex: 0,
+          matchIndex: firstRound.length,
+          round: "Tour 1",
+          time: teamA && teamB ? timeSlots[timeIndex++] : "Bye",
+          teamA,
+          teamB,
+          scoreA: "",
+          scoreB: "",
+          winnerId: null
+        };
+
+        if (teamA && !teamB) match.winnerId = teamA.id;
+        if (!teamA && teamB) match.winnerId = teamB.id;
+
+        firstRound.push(match);
+      }
+
+      bracketRounds.push(firstRound);
+
+      let matchesInRound = firstRound.length / 2;
+      let roundIndex = 1;
+
+      while (matchesInRound >= 1) {
+        const round = [];
+
+        for (let i = 0; i < matchesInRound; i++) {
+          round.push({
+            id: crypto.randomUUID(),
+            roundIndex,
+            matchIndex: i,
+            round: getRoundName(roundIndex, matchesInRound),
+            time: timeSlots[timeIndex++] || "À définir",
+            teamA: null,
+            teamB: null,
+            scoreA: "",
+            scoreB: "",
+            winnerId: null
+          });
+        }
+
+        bracketRounds.push(round);
+        matchesInRound /= 2;
+        roundIndex++;
+      }
+
+      propagateByes();
+
+      document.getElementById("matchesTitle").innerText = "Arbre du tournoi";
+      renderTournament();
+      updateStatus(`Tournoi généré : ${teams.length} équipe(s), ${bracketSize} places dans l’arbre.`);
+    }
+
+    function getRoundName(roundIndex, matchesInRound) {
+      if (matchesInRound === 1) return "Finale";
+      if (matchesInRound === 2) return "Demi-finales";
+      if (matchesInRound === 4) return "Quarts de finale";
+      return `Tour ${roundIndex + 1}`;
+    }
+
+    function propagateByes() {
+      for (let r = 0; r < bracketRounds.length - 1; r++) {
+        bracketRounds[r].forEach(match => {
+          if (match.winnerId) {
+            advanceWinner(match);
+          }
+        });
+      }
+    }
+
+    function renderTournament() {
+      const area = document.getElementById("matchesArea");
+      area.innerHTML = `<div class="bracket"></div>`;
+
+      const bracket = area.querySelector(".bracket");
+
+      bracketRounds.forEach((round, roundIndex) => {
+        const roundDiv = document.createElement("div");
+        roundDiv.className = "round";
+        roundDiv.innerHTML = `<h3>${round[0]?.round || "Tour"}</h3>`;
+
+        round.forEach(match => {
+          const card = createMatchCard(match, "tournament");
+          roundDiv.appendChild(card);
+        });
+
+        bracket.appendChild(roundDiv);
+      });
+    }
+
+    function createMatchCard(match, type) {
+      const div = document.createElement("div");
+      div.className = "match-card";
+
+      const teamAName = match.teamA ? match.teamA.name : "À définir";
+      const teamBName = match.teamB ? match.teamB.name : "À définir";
+
+      const teamAMembers = match.teamA ? match.teamA.members.join(" / ") : "";
+      const teamBMembers = match.teamB ? match.teamB.members.join(" / ") : "";
+
+      const winnerName = getWinnerName(match);
+
+      div.innerHTML = `
+        <div class="match-header">
+          <span>🕒 ${match.time}</span>
+          <span>${winnerName ? "🏆 " + winnerName : "⚪ En attente"}</span>
+        </div>
+
+        <div class="score-row ${match.winnerId === match.teamA?.id ? "winner" : ""}">
+          <div>
+            <strong>${teamAName}</strong><br>
+            <small>${teamAMembers}</small>
+          </div>
+          <input
+            type="number"
+            min="0"
+            value="${match.scoreA}"
+            onchange="updateScore('${match.id}', 'A', this.value, '${type}')"
+            ${!match.teamA || !match.teamB ? "disabled" : ""}
+          />
+        </div>
+
+        <div class="score-row ${match.winnerId === match.teamB?.id ? "winner" : ""}">
+          <div>
+            <strong>${teamBName}</strong><br>
+            <small>${teamBMembers}</small>
+          </div>
+          <input
+            type="number"
+            min="0"
+            value="${match.scoreB}"
+            onchange="updateScore('${match.id}', 'B', this.value, '${type}')"
+            ${!match.teamA || !match.teamB ? "disabled" : ""}
+          />
+        </div>
+      `;
+
+      return div;
+    }
+
+    function getWinnerName(match) {
+      if (!match.winnerId) return null;
+      const allTeams = teams;
+      const winner = allTeams.find(t => t.id === match.winnerId);
+      return winner ? winner.name : null;
+    }
+
+    function updateScore(matchId, side, value, type) {
+      if (type === "chill") {
+        const match = chillMatches.find(m => m.id === matchId);
+        if (!match) return;
+
+        if (side === "A") match.scoreA = Number(value);
+        if (side === "B") match.scoreB = Number(value);
+
+        determineWinner(match);
+        renderChillMatches();
+      }
+
+      if (type === "tournament") {
+        const match = findTournamentMatch(matchId);
+        if (!match) return;
+
+        if (side === "A") match.scoreA = Number(value);
+        if (side === "B") match.scoreB = Number(value);
+
+        determineWinner(match);
+
+        if (match.winnerId) {
+          clearNextRoundsFrom(match);
+          advanceWinner(match);
+        }
+
+        renderTournament();
+        updateTournamentStatus();
+      }
+    }
+
+    function determineWinner(match) {
+      if (match.scoreA === "" || match.scoreB === "") return;
+      if (match.scoreA === match.scoreB) {
+        match.winnerId = null;
+        return;
+      }
+
+      if (!match.teamA || !match.teamB) return;
+
+      match.winnerId = match.scoreA > match.scoreB
+        ? match.teamA.id
+        : match.teamB.id;
+    }
+
+    function findTournamentMatch(matchId) {
+      for (const round of bracketRounds) {
+        const found = round.find(m => m.id === matchId);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    function clearNextRoundsFrom(match) {
+      const nextRoundIndex = match.roundIndex + 1;
+
+      for (let r = nextRoundIndex; r < bracketRounds.length; r++) {
+        bracketRounds[r].forEach(m => {
+          m.scoreA = "";
+          m.scoreB = "";
+          m.winnerId = null;
+
+          if (r > nextRoundIndex) {
+            m.teamA = null;
+            m.teamB = null;
+          }
+        });
+      }
+
+      const nextMatch = bracketRounds[nextRoundIndex]?.[Math.floor(match.matchIndex / 2)];
+      if (!nextMatch) return;
+
+      if (match.matchIndex % 2 === 0) {
+        nextMatch.teamA = null;
+      } else {
+        nextMatch.teamB = null;
+      }
+    }
+
+    function advanceWinner(match) {
+      if (!match.winnerId) return;
+
+      const nextRound = bracketRounds[match.roundIndex + 1];
+      if (!nextRound) return;
+
+      const nextMatchIndex = Math.floor(match.matchIndex / 2);
+      const nextMatch = nextRound[nextMatchIndex];
+
+      const winnerTeam = teams.find(t => t.id === match.winnerId);
+      if (!winnerTeam) return;
+
+      if (match.matchIndex % 2 === 0) {
+        nextMatch.teamA = winnerTeam;
+      } else {
+        nextMatch.teamB = winnerTeam;
+      }
+
+      if (nextMatch.teamA && !nextMatch.teamB) {
+        nextMatch.winnerId = nextMatch.teamA.id;
+        advanceWinner(nextMatch);
+      }
+
+      if (!nextMatch.teamA && nextMatch.teamB) {
+        nextMatch.winnerId = nextMatch.teamB.id;
+        advanceWinner(nextMatch);
+      }
+    }
+
+    function updateTournamentStatus() {
+      const finalRound = bracketRounds[bracketRounds.length - 1];
+      const final = finalRound?.[0];
+
+      if (final?.winnerId) {
+        const winner = teams.find(t => t.id === final.winnerId);
+        updateStatus(`🏆 Tournoi terminé ! Vainqueur : ${winner.name}`);
+      } else {
+        updateStatus("Tournoi en cours. Entre les scores pour faire avancer les équipes.");
+      }
+    }
+
+    function updateStatus(text) {
+      document.getElementById("statusBox").innerText = text;
+    }
+
+    function resetAll() {
+      if (!confirm("Tout supprimer ?")) return;
+
+      participants = [];
+      teams = [];
+      chillMatches = [];
+      bracketRounds = [];
+
+      renderParticipants();
+      renderTeams();
+
+      document.getElementById("matchesTitle").innerText = "Matchs";
+      document.getElementById("matchesArea").innerHTML = `<div class="empty">Aucun match généré.</div>`;
+      updateStatus("Ajoute des participants, choisis le mode, puis génère l’activité.");
+    }
+
+    document.getElementById("playerName").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") addParticipant();
+    });
+
+    renderParticipants();
+  </script>
+</body>
+</html>
