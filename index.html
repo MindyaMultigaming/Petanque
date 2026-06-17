@@ -78,10 +78,10 @@
     }
 
     .container {
-      width: min(1250px, 94%);
+      width: min(1280px, 94%);
       margin: 24px auto;
       display: grid;
-      grid-template-columns: 370px 1fr;
+      grid-template-columns: 380px 1fr;
       gap: 24px;
     }
 
@@ -181,7 +181,7 @@
       line-height: 1.35;
     }
 
-    .duration-box {
+    .info-box {
       background: #eef6dc;
       border-left: 5px solid var(--olive);
       padding: 12px;
@@ -270,7 +270,7 @@
     }
 
     .round {
-      min-width: 290px;
+      min-width: 300px;
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -300,7 +300,7 @@
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
       gap: 10px;
       margin-bottom: 16px;
     }
@@ -320,6 +320,45 @@
       margin-bottom: 4px;
     }
 
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      margin-top: 12px;
+    }
+
+    th {
+      background: var(--green);
+      color: white;
+      padding: 10px;
+      text-align: left;
+    }
+
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #ead9a8;
+    }
+
+    tr:nth-child(even) {
+      background: #fff8df;
+    }
+
+    .swiss-controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+
+    .swiss-controls button {
+      width: auto;
+      flex: 1;
+      min-width: 180px;
+    }
+
     @media (max-width: 900px) {
       .container {
         grid-template-columns: 1fr;
@@ -331,7 +370,7 @@
 <body>
   <header>
     <h1>🏆 Gestionnaire de Pétanque</h1>
-    <p>Inscriptions, équipes, durée automatique, matchs chill ou tournoi, scores et progression.</p>
+    <p>Inscriptions, équipes, durée automatique, tournoi, ronde suisse, scores et boules nécessaires.</p>
   </header>
 
   <main class="container">
@@ -348,6 +387,7 @@
       <select id="mode">
         <option value="chill">Match chill</option>
         <option value="tournament">Tournoi élimination directe</option>
+        <option value="swiss">Ronde suisse sans élimination</option>
       </select>
 
       <label for="startTime">Heure de début</label>
@@ -369,16 +409,20 @@
         <option value="3">Triplette - 3 joueurs</option>
       </select>
 
-      <div class="duration-box" id="durationInfo">
+      <div class="info-box" id="durationInfo">
         La durée des matchs sera calculée automatiquement selon la session.
+      </div>
+
+      <div class="info-box" id="ballsInfo">
+        Le calculateur de boules sera mis à jour après génération.
       </div>
 
       <button class="secondary" onclick="generateActivity()">Générer l’activité</button>
       <button class="danger" onclick="resetAll()">Tout réinitialiser</button>
 
       <p class="footer-note">
-        Le site calcule la durée des matchs selon la plage horaire, le nombre d’équipes,
-        le format choisi et la marge de sécurité.
+        Règle utilisée pour le calculateur : doublette = 3 boules par joueur,
+        triplette = 2 boules par joueur. Le site ajoute aussi une marge de boules de secours.
       </p>
     </section>
 
@@ -402,6 +446,10 @@
           <strong>-</strong>
           Durée / match
         </div>
+        <div class="summary-card">
+          <strong>-</strong>
+          Boules
+        </div>
       </div>
 
       <h2>Équipes</h2>
@@ -413,15 +461,24 @@
       <div id="matchesArea">
         <div class="empty">Aucun match généré.</div>
       </div>
+
+      <div id="rankingArea"></div>
     </section>
   </main>
 
   <script>
     let participants = [];
     let teams = [];
+
     let chillMatches = [];
     let bracketRounds = [];
+
+    let swissRounds = [];
+    let swissMaxRounds = 0;
+    let swissCurrentRound = 0;
+
     let lastCalculatedDuration = null;
+    let lastBallsNeeded = null;
 
     function addParticipant() {
       const input = document.getElementById("playerName");
@@ -442,12 +499,14 @@
 
       renderParticipants();
       updateSummary();
+      updateBallsInfo();
     }
 
     function removeParticipant(name) {
       participants = participants.filter(p => p !== name);
       renderParticipants();
       updateSummary();
+      updateBallsInfo();
     }
 
     function renderParticipants() {
@@ -474,6 +533,14 @@
       return text.replace(/'/g, "\\'");
     }
 
+    function createId() {
+      if (window.crypto && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+
+      return "id-" + Math.random().toString(36).substring(2, 12);
+    }
+
     function shuffle(array) {
       return [...array].sort(() => Math.random() - 0.5);
     }
@@ -493,6 +560,11 @@
 
       chillMatches = [];
       bracketRounds = [];
+      swissRounds = [];
+      swissMaxRounds = 0;
+      swissCurrentRound = 0;
+
+      document.getElementById("rankingArea").innerHTML = "";
 
       renderTeams();
 
@@ -500,10 +572,17 @@
 
       if (mode === "chill") {
         generateChillMatches();
-      } else {
+      }
+
+      if (mode === "tournament") {
         generateTournament();
       }
 
+      if (mode === "swiss") {
+        generateSwissTournament();
+      }
+
+      updateBallsInfo();
       updateSummary();
     }
 
@@ -542,7 +621,7 @@
         const div = document.createElement("div");
         div.className = "team-card";
 
-        const note = team.members.length === 1
+        const note = team.members.length < Number(document.getElementById("teamSize").value)
           ? `<br><small>⚠️ Équipe incomplète</small>`
           : "";
 
@@ -564,11 +643,12 @@
         }
       }
 
-      const schedule = getTimeSlots(pairs.length);
+      const schedule = getSequentialSchedule(pairs.length);
       const timeSlots = schedule.slots;
 
       chillMatches = pairs.map((pair, index) => ({
         id: createId(),
+        type: "chill",
         round: "Match chill",
         time: timeSlots[index],
         teamA: pair[0],
@@ -582,7 +662,7 @@
       renderChillMatches();
 
       updateStatus(`Mode chill généré : ${chillMatches.length} match(s) à jouer.`);
-      updateDurationInfo(schedule, chillMatches.length, "chill");
+      updateDurationInfo(schedule, chillMatches.length, "match chill");
     }
 
     function renderChillMatches() {
@@ -592,8 +672,7 @@
       const list = area.querySelector(".matches");
 
       chillMatches.forEach(match => {
-        const card = createMatchCard(match, "chill");
-        list.appendChild(card);
+        list.appendChild(createMatchCard(match, "chill"));
       });
     }
 
@@ -602,7 +681,7 @@
       const bracketSize = nextPowerOfTwo(shuffledTeams.length);
       const totalTournamentMatches = bracketSize - 1;
 
-      const schedule = getTimeSlots(totalTournamentMatches);
+      const schedule = getSequentialSchedule(totalTournamentMatches);
       const timeSlots = schedule.slots;
 
       const paddedTeams = [...shuffledTeams];
@@ -622,6 +701,7 @@
 
         const match = {
           id: createId(),
+          type: "tournament",
           roundIndex: 0,
           matchIndex: firstRound.length,
           round: "Tour 1",
@@ -633,13 +713,8 @@
           winnerId: null
         };
 
-        if (teamA && !teamB) {
-          match.winnerId = teamA.id;
-        }
-
-        if (!teamA && teamB) {
-          match.winnerId = teamB.id;
-        }
+        if (teamA && !teamB) match.winnerId = teamA.id;
+        if (!teamA && teamB) match.winnerId = teamB.id;
 
         firstRound.push(match);
       }
@@ -655,6 +730,7 @@
         for (let i = 0; i < matchesInRound; i++) {
           round.push({
             id: createId(),
+            type: "tournament",
             roundIndex,
             matchIndex: i,
             round: getRoundName(roundIndex, matchesInRound),
@@ -678,7 +754,7 @@
       renderTournament();
 
       updateStatus(`Tournoi généré : ${teams.length} équipe(s), ${bracketSize} places dans l’arbre.`);
-      updateDurationInfo(schedule, totalTournamentMatches, "tournament");
+      updateDurationInfo(schedule, totalTournamentMatches, "tournoi élimination directe");
     }
 
     function renderTournament() {
@@ -693,12 +769,348 @@
         roundDiv.innerHTML = `<h3>${round[0]?.round || "Tour"}</h3>`;
 
         round.forEach(match => {
-          const card = createMatchCard(match, "tournament");
-          roundDiv.appendChild(card);
+          roundDiv.appendChild(createMatchCard(match, "tournament"));
         });
 
         bracket.appendChild(roundDiv);
       });
+    }
+
+    function generateSwissTournament() {
+      swissMaxRounds = calculateSwissRounds(teams.length);
+      swissCurrentRound = 0;
+
+      const matchesPerRound = Math.floor(teams.length / 2);
+      const schedule = getRoundBasedSchedule(swissMaxRounds);
+
+      createNextSwissRound(schedule);
+
+      document.getElementById("matchesTitle").innerText = "Ronde suisse";
+      renderSwissTournament();
+
+      updateStatus(
+        `Ronde suisse générée : ${swissMaxRounds} ronde(s), environ ${matchesPerRound} match(s) simultané(s) par ronde.`
+      );
+
+      updateDurationInfo(schedule, swissMaxRounds, "ronde suisse");
+      renderSwissRanking(false);
+    }
+
+    function calculateSwissRounds(teamCount) {
+      if (teamCount <= 2) return 1;
+
+      const theoretical = Math.ceil(Math.log2(teamCount)) + 1;
+      const maxWithoutTooManyRematches = teamCount - 1;
+
+      return Math.max(2, Math.min(theoretical, maxWithoutTooManyRematches));
+    }
+
+    function createNextSwissRound(schedule) {
+      if (swissCurrentRound >= swissMaxRounds) {
+        return;
+      }
+
+      const standings = getSwissStandings();
+      let orderedTeams;
+
+      if (swissCurrentRound === 0) {
+        orderedTeams = shuffle(teams);
+      } else {
+        orderedTeams = standings.map(row => row.team);
+      }
+
+      const pairings = createSwissPairings(orderedTeams);
+
+      const roundNumber = swissCurrentRound + 1;
+      const roundStart = schedule.slots[swissCurrentRound] || "À définir";
+
+      const matches = pairings.map((pair, index) => {
+        if (pair.bye) {
+          return {
+            id: createId(),
+            type: "swiss",
+            roundIndex: swissCurrentRound,
+            round: `Ronde ${roundNumber}`,
+            time: "Bye",
+            teamA: pair.teamA,
+            teamB: null,
+            scoreA: 13,
+            scoreB: 0,
+            winnerId: pair.teamA.id,
+            isBye: true
+          };
+        }
+
+        return {
+          id: createId(),
+          type: "swiss",
+          roundIndex: swissCurrentRound,
+          round: `Ronde ${roundNumber}`,
+          time: roundStart,
+          teamA: pair.teamA,
+          teamB: pair.teamB,
+          scoreA: "",
+          scoreB: "",
+          winnerId: null,
+          isBye: false
+        };
+      });
+
+      swissRounds.push(matches);
+      swissCurrentRound++;
+    }
+
+    function createSwissPairings(orderedTeams) {
+      const available = [...orderedTeams];
+      const pairings = [];
+
+      while (available.length > 1) {
+        const teamA = available.shift();
+
+        let opponentIndex = available.findIndex(teamB => !havePlayedBefore(teamA.id, teamB.id));
+
+        if (opponentIndex === -1) {
+          opponentIndex = 0;
+        }
+
+        const teamB = available.splice(opponentIndex, 1)[0];
+
+        pairings.push({
+          teamA,
+          teamB,
+          bye: false
+        });
+      }
+
+      if (available.length === 1) {
+        pairings.push({
+          teamA: available[0],
+          teamB: null,
+          bye: true
+        });
+      }
+
+      return pairings;
+    }
+
+    function havePlayedBefore(teamAId, teamBId) {
+      for (const round of swissRounds) {
+        for (const match of round) {
+          if (!match.teamA || !match.teamB) continue;
+
+          const sameOrder = match.teamA.id === teamAId && match.teamB.id === teamBId;
+          const reverseOrder = match.teamA.id === teamBId && match.teamB.id === teamAId;
+
+          if (sameOrder || reverseOrder) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    }
+
+    function renderSwissTournament() {
+      const area = document.getElementById("matchesArea");
+      area.innerHTML = "";
+
+      const controls = document.createElement("div");
+      controls.className = "swiss-controls";
+      controls.innerHTML = `
+        <button class="secondary" onclick="tryGenerateNextSwissRound()">Générer la ronde suivante</button>
+        <button onclick="renderSwissRanking(true)">Afficher / mettre à jour le classement</button>
+      `;
+
+      area.appendChild(controls);
+
+      const bracket = document.createElement("div");
+      bracket.className = "bracket";
+
+      swissRounds.forEach((round, roundIndex) => {
+        const roundDiv = document.createElement("div");
+        roundDiv.className = "round";
+        roundDiv.innerHTML = `<h3>Ronde ${roundIndex + 1}</h3>`;
+
+        round.forEach(match => {
+          roundDiv.appendChild(createMatchCard(match, "swiss"));
+        });
+
+        bracket.appendChild(roundDiv);
+      });
+
+      area.appendChild(bracket);
+    }
+
+    function tryGenerateNextSwissRound() {
+      if (swissRounds.length === 0) return;
+
+      const lastRound = swissRounds[swissRounds.length - 1];
+
+      if (!isRoundComplete(lastRound)) {
+        alert("Entre tous les scores de la ronde actuelle avant de générer la suivante.");
+        return;
+      }
+
+      if (swissCurrentRound >= swissMaxRounds) {
+        renderSwissRanking(true);
+        updateStatus("Ronde suisse terminée. Le classement final est disponible.");
+        alert("Toutes les rondes sont terminées.");
+        return;
+      }
+
+      const schedule = getRoundBasedSchedule(swissMaxRounds);
+      createNextSwissRound(schedule);
+
+      renderSwissTournament();
+      renderSwissRanking(false);
+
+      if (swissCurrentRound >= swissMaxRounds) {
+        updateStatus("Dernière ronde générée. Entre les scores pour obtenir le classement final.");
+      } else {
+        updateStatus(`Ronde ${swissCurrentRound} générée. Continue à entrer les scores.`);
+      }
+    }
+
+    function isRoundComplete(round) {
+      return round.every(match => {
+        if (match.isBye) return true;
+        return match.scoreA !== "" && match.scoreB !== "";
+      });
+    }
+
+    function renderSwissRanking(forceShow) {
+      const rankingArea = document.getElementById("rankingArea");
+
+      if (!forceShow && swissRounds.length === 0) {
+        rankingArea.innerHTML = "";
+        return;
+      }
+
+      const standings = getSwissStandings();
+
+      let html = `
+        <h2>Classement ronde suisse</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Équipe</th>
+              <th>Joueurs</th>
+              <th>Pts</th>
+              <th>J</th>
+              <th>V</th>
+              <th>N</th>
+              <th>D</th>
+              <th>Score +</th>
+              <th>Score -</th>
+              <th>Diff.</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      standings.forEach((row, index) => {
+        html += `
+          <tr>
+            <td>${index + 1}</td>
+            <td><strong>${row.team.name}</strong></td>
+            <td>${row.team.members.join(" / ")}</td>
+            <td><strong>${row.points}</strong></td>
+            <td>${row.played}</td>
+            <td>${row.wins}</td>
+            <td>${row.draws}</td>
+            <td>${row.losses}</td>
+            <td>${row.scoreFor}</td>
+            <td>${row.scoreAgainst}</td>
+            <td>${row.diff}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+          </tbody>
+        </table>
+      `;
+
+      rankingArea.innerHTML = html;
+    }
+
+    function getSwissStandings() {
+      const rows = teams.map(team => ({
+        team,
+        points: 0,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        scoreFor: 0,
+        scoreAgainst: 0,
+        diff: 0
+      }));
+
+      const getRow = teamId => rows.find(row => row.team.id === teamId);
+
+      for (const round of swissRounds) {
+        for (const match of round) {
+          if (!match.teamA) continue;
+          if (match.scoreA === "" || match.scoreB === "") continue;
+
+          const rowA = getRow(match.teamA.id);
+
+          if (match.isBye) {
+            rowA.points += 3;
+            rowA.played += 1;
+            rowA.wins += 1;
+            rowA.scoreFor += 13;
+            rowA.scoreAgainst += 0;
+            continue;
+          }
+
+          if (!match.teamB) continue;
+
+          const rowB = getRow(match.teamB.id);
+
+          const scoreA = Number(match.scoreA);
+          const scoreB = Number(match.scoreB);
+
+          rowA.played += 1;
+          rowB.played += 1;
+
+          rowA.scoreFor += scoreA;
+          rowA.scoreAgainst += scoreB;
+
+          rowB.scoreFor += scoreB;
+          rowB.scoreAgainst += scoreA;
+
+          if (scoreA > scoreB) {
+            rowA.points += 3;
+            rowA.wins += 1;
+            rowB.losses += 1;
+          } else if (scoreB > scoreA) {
+            rowB.points += 3;
+            rowB.wins += 1;
+            rowA.losses += 1;
+          } else {
+            rowA.points += 1;
+            rowB.points += 1;
+            rowA.draws += 1;
+            rowB.draws += 1;
+          }
+        }
+      }
+
+      rows.forEach(row => {
+        row.diff = row.scoreFor - row.scoreAgainst;
+      });
+
+      rows.sort((a, b) => {
+        if (b.points !== a.points) return b.points - a.points;
+        if (b.diff !== a.diff) return b.diff - a.diff;
+        if (b.scoreFor !== a.scoreFor) return b.scoreFor - a.scoreFor;
+        return a.team.name.localeCompare(b.team.name);
+      });
+
+      return rows;
     }
 
     function createMatchCard(match, type) {
@@ -729,7 +1141,7 @@
             min="0"
             value="${match.scoreA}"
             onchange="updateScore('${match.id}', 'A', this.value, '${type}')"
-            ${!match.teamA || !match.teamB ? "disabled" : ""}
+            ${!match.teamA || !match.teamB || match.isBye ? "disabled" : ""}
           />
         </div>
 
@@ -743,7 +1155,7 @@
             min="0"
             value="${match.scoreB}"
             onchange="updateScore('${match.id}', 'B', this.value, '${type}')"
-            ${!match.teamA || !match.teamB ? "disabled" : ""}
+            ${!match.teamA || !match.teamB || match.isBye ? "disabled" : ""}
           />
         </div>
       `;
@@ -756,14 +1168,7 @@
         const match = chillMatches.find(m => m.id === matchId);
         if (!match) return;
 
-        if (side === "A") {
-          match.scoreA = value === "" ? "" : Number(value);
-        }
-
-        if (side === "B") {
-          match.scoreB = value === "" ? "" : Number(value);
-        }
-
+        updateMatchScore(match, side, value);
         determineWinner(match);
         renderChillMatches();
       }
@@ -772,14 +1177,7 @@
         const match = findTournamentMatch(matchId);
         if (!match) return;
 
-        if (side === "A") {
-          match.scoreA = value === "" ? "" : Number(value);
-        }
-
-        if (side === "B") {
-          match.scoreB = value === "" ? "" : Number(value);
-        }
-
+        updateMatchScore(match, side, value);
         determineWinner(match);
 
         if (match.winnerId) {
@@ -789,6 +1187,32 @@
 
         renderTournament();
         updateTournamentStatus();
+      }
+
+      if (type === "swiss") {
+        const match = findSwissMatch(matchId);
+        if (!match) return;
+
+        updateMatchScore(match, side, value);
+        determineWinner(match);
+
+        renderSwissTournament();
+        renderSwissRanking(false);
+
+        if (isSwissFinished()) {
+          renderSwissRanking(true);
+          updateStatus("Ronde suisse terminée. Le classement final est disponible.");
+        }
+      }
+    }
+
+    function updateMatchScore(match, side, value) {
+      if (side === "A") {
+        match.scoreA = value === "" ? "" : Number(value);
+      }
+
+      if (side === "B") {
+        match.scoreB = value === "" ? "" : Number(value);
       }
     }
 
@@ -812,8 +1236,24 @@
         : match.teamB.id;
     }
 
+    function getWinnerName(match) {
+      if (!match.winnerId) return null;
+
+      const winner = teams.find(t => t.id === match.winnerId);
+      return winner ? winner.name : null;
+    }
+
     function findTournamentMatch(matchId) {
       for (const round of bracketRounds) {
+        const found = round.find(m => m.id === matchId);
+        if (found) return found;
+      }
+
+      return null;
+    }
+
+    function findSwissMatch(matchId) {
+      for (const round of swissRounds) {
         const found = round.find(m => m.id === matchId);
         if (found) return found;
       }
@@ -898,22 +1338,18 @@
       }
     }
 
-    function getTimeSlots(matchCount) {
-      const start = document.getElementById("startTime").value;
-      const end = document.getElementById("endTime").value;
-      const marginRatio = Number(document.getElementById("sessionMargin").value);
+    function isSwissFinished() {
+      if (swissRounds.length < swissMaxRounds) {
+        return false;
+      }
 
-      const [sh, sm] = start.split(":").map(Number);
-      const [eh, em] = end.split(":").map(Number);
+      return swissRounds.every(round => isRoundComplete(round));
+    }
 
-      const startMin = sh * 60 + sm;
-      const endMin = eh * 60 + em;
+    function getSequentialSchedule(matchCount) {
+      const base = getSessionBase();
 
-      const totalDuration = endMin - startMin;
-
-      if (totalDuration <= 0) {
-        alert("L'heure de fin doit être après l'heure de début.");
-
+      if (!base.valid || matchCount <= 0) {
         return {
           slots: [],
           matchDuration: 0,
@@ -923,30 +1359,17 @@
         };
       }
 
-      if (matchCount <= 0) {
-        return {
-          slots: [],
-          matchDuration: 0,
-          marginMinutes: 0,
-          usableDuration: totalDuration,
-          totalDuration
-        };
-      }
-
-      const marginMinutes = Math.round(totalDuration * marginRatio);
-      const usableDuration = totalDuration - marginMinutes;
-
-      let matchDuration = Math.floor(usableDuration / matchCount);
+      let matchDuration = Math.floor(base.usableDuration / matchCount);
 
       if (matchDuration < 8) {
         matchDuration = 8;
       }
 
       const slots = [];
-      let current = startMin;
+      let current = base.startMin;
 
       for (let i = 0; i < matchCount; i++) {
-        if (current + matchDuration <= endMin) {
+        if (current + matchDuration <= base.endMin) {
           slots.push(formatMinutes(current));
           current += matchDuration;
         } else {
@@ -957,9 +1380,87 @@
       return {
         slots,
         matchDuration,
+        marginMinutes: base.marginMinutes,
+        usableDuration: base.usableDuration,
+        totalDuration: base.totalDuration
+      };
+    }
+
+    function getRoundBasedSchedule(roundCount) {
+      const base = getSessionBase();
+
+      if (!base.valid || roundCount <= 0) {
+        return {
+          slots: [],
+          matchDuration: 0,
+          marginMinutes: 0,
+          usableDuration: 0,
+          totalDuration: 0
+        };
+      }
+
+      let matchDuration = Math.floor(base.usableDuration / roundCount);
+
+      if (matchDuration < 8) {
+        matchDuration = 8;
+      }
+
+      const slots = [];
+      let current = base.startMin;
+
+      for (let i = 0; i < roundCount; i++) {
+        if (current + matchDuration <= base.endMin) {
+          slots.push(formatMinutes(current));
+          current += matchDuration;
+        } else {
+          slots.push("Hors plage");
+        }
+      }
+
+      return {
+        slots,
+        matchDuration,
+        marginMinutes: base.marginMinutes,
+        usableDuration: base.usableDuration,
+        totalDuration: base.totalDuration
+      };
+    }
+
+    function getSessionBase() {
+      const start = document.getElementById("startTime").value;
+      const end = document.getElementById("endTime").value;
+      const marginRatio = Number(document.getElementById("sessionMargin").value);
+
+      const [sh, sm] = start.split(":").map(Number);
+      const [eh, em] = end.split(":").map(Number);
+
+      const startMin = sh * 60 + sm;
+      const endMin = eh * 60 + em;
+      const totalDuration = endMin - startMin;
+
+      if (totalDuration <= 0) {
+        alert("L'heure de fin doit être après l'heure de début.");
+
+        return {
+          valid: false,
+          startMin,
+          endMin,
+          totalDuration: 0,
+          marginMinutes: 0,
+          usableDuration: 0
+        };
+      }
+
+      const marginMinutes = Math.round(totalDuration * marginRatio);
+      const usableDuration = totalDuration - marginMinutes;
+
+      return {
+        valid: true,
+        startMin,
+        endMin,
+        totalDuration,
         marginMinutes,
-        usableDuration,
-        totalDuration
+        usableDuration
       };
     }
 
@@ -969,7 +1470,7 @@
       return `${h}:${m}`;
     }
 
-    function updateDurationInfo(schedule, matchCount, mode) {
+    function updateDurationInfo(schedule, count, modeText) {
       const box = document.getElementById("durationInfo");
 
       if (!box) return;
@@ -985,20 +1486,18 @@
 
       const outsideCount = schedule.slots.filter(slot => slot === "Hors plage").length;
 
-      let modeText = mode === "tournament"
-        ? "tournoi"
-        : "match chill";
-
       let warning = "";
 
       if (outsideCount > 0) {
-        warning = ` ⚠️ Attention : ${outsideCount} match(s) dépassent la plage horaire.`;
+        warning = ` ⚠️ Attention : ${outsideCount} créneau(x) dépassent la plage horaire.`;
       }
+
+      const unit = modeText === "ronde suisse" ? "ronde" : "match";
 
       box.innerText =
         `Format : ${modeText}. ` +
-        `Durée calculée : ${schedule.matchDuration} min par match. ` +
-        `Matchs prévus : ${matchCount}. ` +
+        `Durée calculée : ${schedule.matchDuration} min par ${unit}. ` +
+        `Nombre prévu : ${count}. ` +
         `Session totale : ${schedule.totalDuration} min. ` +
         `Marge gardée : ${schedule.marginMinutes} min.` +
         warning;
@@ -1006,13 +1505,52 @@
       updateSummary();
     }
 
-    function updateStatus(text) {
-      document.getElementById("statusBox").innerText = text;
+    function updateBallsInfo() {
+      const box = document.getElementById("ballsInfo");
+      const teamSize = Number(document.getElementById("teamSize").value);
+
+      const playerCount = participants.length;
+      let ballsPerPlayer;
+
+      if (teamSize === 2) {
+        ballsPerPlayer = 3;
+      } else {
+        ballsPerPlayer = 2;
+      }
+
+      const minimumBalls = playerCount * ballsPerPlayer;
+      const spareBalls = Math.ceil(minimumBalls * 0.15);
+      const comfortableBalls = minimumBalls + spareBalls;
+
+      const setsOfThreeMinimum = Math.ceil(minimumBalls / 3);
+      const setsOfThreeComfortable = Math.ceil(comfortableBalls / 3);
+
+      const teamCount = teams.length || Math.ceil(playerCount / teamSize);
+      const simultaneousMatches = Math.floor(teamCount / 2);
+      const cochonnets = Math.max(2, simultaneousMatches + 1);
+
+      lastBallsNeeded = minimumBalls;
+
+      if (playerCount === 0) {
+        box.innerText = "Le calculateur de boules sera mis à jour après ajout des participants.";
+      } else {
+        box.innerText =
+          `Boules nécessaires minimum : ${minimumBalls}. ` +
+          `Confort conseillé : ${comfortableBalls} boules, soit environ ${setsOfThreeComfortable} triplette(s) de boules. ` +
+          `Cochonnets conseillés : ${cochonnets}. ` +
+          `Base de calcul : ${ballsPerPlayer} boule(s) par joueur.`;
+      }
+
+      updateSummary();
     }
 
     function updateSummary() {
       const durationText = lastCalculatedDuration
         ? `${lastCalculatedDuration} min`
+        : "-";
+
+      const ballsText = lastBallsNeeded
+        ? `${lastBallsNeeded}`
         : "-";
 
       document.getElementById("summaryGrid").innerHTML = `
@@ -1026,9 +1564,17 @@
         </div>
         <div class="summary-card">
           <strong>${durationText}</strong>
-          Durée / match
+          Durée
+        </div>
+        <div class="summary-card">
+          <strong>${ballsText}</strong>
+          Boules min.
         </div>
       `;
+    }
+
+    function updateStatus(text) {
+      document.getElementById("statusBox").innerText = text;
     }
 
     function nextPowerOfTwo(n) {
@@ -1048,22 +1594,21 @@
       return `Tour ${roundIndex + 1}`;
     }
 
-    function createId() {
-      if (window.crypto && crypto.randomUUID) {
-        return crypto.randomUUID();
-      }
-
-      return "id-" + Math.random().toString(36).substring(2, 12);
-    }
-
     function resetAll() {
       if (!confirm("Tout supprimer ?")) return;
 
       participants = [];
       teams = [];
+
       chillMatches = [];
       bracketRounds = [];
+
+      swissRounds = [];
+      swissMaxRounds = 0;
+      swissCurrentRound = 0;
+
       lastCalculatedDuration = null;
+      lastBallsNeeded = null;
 
       renderParticipants();
       renderTeams();
@@ -1071,11 +1616,15 @@
 
       document.getElementById("matchesTitle").innerText = "Matchs";
       document.getElementById("matchesArea").innerHTML = `<div class="empty">Aucun match généré.</div>`;
+      document.getElementById("rankingArea").innerHTML = "";
 
       updateStatus("Ajoute des participants, choisis le mode, puis génère l’activité.");
 
       document.getElementById("durationInfo").innerText =
         "La durée des matchs sera calculée automatiquement selon la session.";
+
+      document.getElementById("ballsInfo").innerText =
+        "Le calculateur de boules sera mis à jour après génération.";
     }
 
     document.getElementById("playerName").addEventListener("keydown", function(e) {
@@ -1084,8 +1633,13 @@
       }
     });
 
+    document.getElementById("teamSize").addEventListener("change", function() {
+      updateBallsInfo();
+    });
+
     renderParticipants();
     updateSummary();
+    updateBallsInfo();
   </script>
 </body>
 </html>
