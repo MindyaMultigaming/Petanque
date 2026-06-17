@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chifumi 2 Joueurs</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: radial-gradient(circle at top, #34495e, #111827);
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .game {
+      width: 100%;
+      max-width: 1000px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 42px;
+    }
+
+    .subtitle {
+      opacity: 0.8;
+      margin-bottom: 30px;
+    }
+
+    .players {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      margin-bottom: 30px;
+    }
+
+    .player {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 25px;
+      border: 2px solid transparent;
+      transition: 0.2s;
+    }
+
+    .player.ready {
+      border-color: #22c55e;
+    }
+
+    .player h2 {
+      margin-top: 0;
+      font-size: 28px;
+    }
+
+    .join-btn,
+    .choice-btn,
+    .reset-btn {
+      border: none;
+      cursor: pointer;
+      border-radius: 14px;
+      padding: 14px 20px;
+      font-size: 18px;
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    .join-btn {
+      background: #38bdf8;
+      color: #082f49;
+    }
+
+    .join-btn:hover {
+      background: #7dd3fc;
+      transform: translateY(-2px);
+    }
+
+    .join-btn:disabled {
+      background: #64748b;
+      color: #cbd5e1;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .choices {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .choice-btn {
+      background: #facc15;
+      color: #422006;
+      min-width: 120px;
+    }
+
+    .choice-btn:hover {
+      background: #fde047;
+      transform: scale(1.05);
+    }
+
+    .choice-btn:disabled {
+      background: #475569;
+      color: #cbd5e1;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status {
+      font-size: 22px;
+      margin: 25px 0;
+      min-height: 35px;
+    }
+
+    .countdown {
+      font-size: 70px;
+      font-weight: bold;
+      color: #facc15;
+      min-height: 90px;
+    }
+
+    .reveal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 25px;
+      margin-top: 25px;
+    }
+
+    .reveal-box {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 18px;
+      padding: 25px;
+      min-height: 150px;
+    }
+
+    .choice-display {
+      font-size: 70px;
+      margin-top: 15px;
+    }
+
+    .winner {
+      margin-top: 30px;
+      font-size: 32px;
+      font-weight: bold;
+      color: #22c55e;
+      min-height: 45px;
+    }
+
+    .reset-btn {
+      margin-top: 25px;
+      background: #ef4444;
+      color: white;
+    }
+
+    .reset-btn:hover {
+      background: #f87171;
+      transform: translateY(-2px);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 750px) {
+      .players,
+      .reveal {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 32px;
+      }
+
+      .countdown {
+        font-size: 55px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game">
+    <h1>✊ 🖐 ✌️ Chifumi</h1>
+    <p class="subtitle">Deux joueurs, un choix secret, puis révélation après le compte à rebours.</p>
+
+    <div class="players">
+      <div class="player" id="player1Box">
+        <h2>Joueur 1</h2>
+        <p id="player1Status">En attente...</p>
+        <button class="join-btn" id="joinP1" onclick="joinPlayer(1)">Rejoindre Joueur 1</button>
+
+        <div class="choices hidden" id="choicesP1">
+          <button class="choice-btn" onclick="choose(1, 'pierre')">✊ Pierre</button>
+          <button class="choice-btn" onclick="choose(1, 'feuille')">🖐 Feuille</button>
+          <button class="choice-btn" onclick="choose(1, 'ciseaux')">✌️ Ciseaux</button>
+        </div>
+      </div>
+
+      <div class="player" id="player2Box">
+        <h2>Joueur 2</h2>
+        <p id="player2Status">En attente...</p>
+        <button class="join-btn" id="joinP2" onclick="joinPlayer(2)">Rejoindre Joueur 2</button>
+
+        <div class="choices hidden" id="choicesP2">
+          <button class="choice-btn" onclick="choose(2, 'pierre')">✊ Pierre</button>
+          <button class="choice-btn" onclick="choose(2, 'feuille')">🖐 Feuille</button>
+          <button class="choice-btn" onclick="choose(2, 'ciseaux')">✌️ Ciseaux</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="statusText">
+      Les joueurs doivent d’abord rejoindre une place.
+    </div>
+
+    <div class="countdown" id="countdown"></div>
+
+    <div class="reveal hidden" id="revealZone">
+      <div class="reveal-box">
+        <h2>Joueur 1</h2>
+        <div class="choice-display" id="revealP1">?</div>
+      </div>
+
+      <div class="reveal-box">
+        <h2>Joueur 2</h2>
+        <div class="choice-display" id="revealP2">?</div>
+      </div>
+    </div>
+
+    <div class="winner" id="winnerText"></div>
+
+    <button class="reset-btn hidden" id="resetBtn" onclick="resetRound()">Nouvelle manche</button>
+  </div>
+
+  <script>
+    const game = {
+      player1Joined: false,
+      player2Joined: false,
+      player1Choice: null,
+      player2Choice: null,
+      roundLocked: false
+    };
+
+    const emojis = {
+      pierre: "✊",
+      feuille: "🖐",
+      ciseaux: "✌️"
+    };
+
+    function joinPlayer(player) {
+      if (player === 1 && !game.player1Joined) {
+        game.player1Joined = true;
+        document.getElementById("player1Status").textContent = "Prêt";
+        document.getElementById("player1Box").classList.add("ready");
+        document.getElementById("joinP1").disabled = true;
+      }
+
+      if (player === 2 && !game.player2Joined) {
+        game.player2Joined = true;
+        document.getElementById("player2Status").textContent = "Prêt";
+        document.getElementById("player2Box").classList.add("ready");
+        document.getElementById("joinP2").disabled = true;
+      }
+
+      checkPlayersReady();
+    }
+
+    function checkPlayersReady() {
+      if (game.player1Joined && game.player2Joined) {
+        document.getElementById("statusText").textContent = "Les deux joueurs sont prêts. Choisissez secrètement votre coup.";
+        document.getElementById("choicesP1").classList.remove("hidden");
+        document.getElementById("choicesP2").classList.remove("hidden");
+      } else {
+        document.getElementById("statusText").textContent = "En attente du deuxième joueur...";
+      }
+    }
+
+    function choose(player, choice) {
+      if (game.roundLocked) return;
+
+      if (player === 1 && game.player1Joined) {
+        game.player1Choice = choice;
+        document.getElementById("player1Status").textContent = "Choix validé ✅";
+        disableChoices(1);
+      }
+
+      if (player === 2 && game.player2Joined) {
+        game.player2Choice = choice;
+        document.getElementById("player2Status").textContent = "Choix validé ✅";
+        disableChoices(2);
+      }
+
+      if (game.player1Choice && game.player2Choice) {
+        startCountdown();
+      } else {
+        document.getElementById("statusText").textContent = "Un joueur a choisi. En attente de l'autre joueur...";
+      }
+    }
+
+    function disableChoices(player) {
+      const buttons = document.querySelectorAll(`#choicesP${player} .choice-btn`);
+      buttons.forEach(button => button.disabled = true);
+    }
+
+    function enableChoices(player) {
+      const buttons = document.querySelectorAll(`#choicesP${player} .choice-btn`);
+      buttons.forEach(button => button.disabled = false);
+    }
+
+    function startCountdown() {
+      game.roundLocked = true;
+
+      document.getElementById("statusText").textContent = "Révélation dans...";
+      let count = 3;
+      document.getElementById("countdown").textContent = count;
+
+      const timer = setInterval(() => {
+        count--;
+
+        if (count > 0) {
+          document.getElementById("countdown").textContent = count;
+        } else {
+          clearInterval(timer);
+          document.getElementById("countdown").textContent = "GO!";
+          setTimeout(revealChoices, 700);
+        }
+      }, 1000);
+    }
+
+    function revealChoices() {
+      document.getElementById("countdown").textContent = "";
+      document.getElementById("revealZone").classList.remove("hidden");
+
+      document.getElementById("revealP1").textContent = emojis[game.player1Choice];
+      document.getElementById("revealP2").textContent = emojis[game.player2Choice];
+
+      const result = getWinner(game.player1Choice, game.player2Choice);
+
+      document.getElementById("winnerText").textContent = result;
+      document.getElementById("statusText").textContent = "Résultat de la manche";
+      document.getElementById("resetBtn").classList.remove("hidden");
+    }
+
+    function getWinner(choice1, choice2) {
+      if (choice1 === choice2) {
+        return "Égalité 🤝";
+      }
+
+      if (
+        (choice1 === "pierre" && choice2 === "ciseaux") ||
+        (choice1 === "feuille" && choice2 === "pierre") ||
+        (choice1 === "ciseaux" && choice2 === "feuille")
+      ) {
+        return "Joueur 1 gagne 🎉";
+      }
+
+      return "Joueur 2 gagne 🎉";
+    }
+
+    function resetRound() {
+      game.player1Choice = null;
+      game.player2Choice = null;
+      game.roundLocked = false;
+
+      document.getElementById("player1Status").textContent = "Prêt";
+      document.getElementById("player2Status").textContent = "Prêt";
+
+      document.getElementById("statusText").textContent = "Nouvelle manche. Choisissez votre coup.";
+      document.getElementById("countdown").textContent = "";
+      document.getElementById("winnerText").textContent = "";
+
+      document.getElementById("revealP1").textContent = "?";
+      document.getElementById("revealP2").textContent = "?";
+      document.getElementById("revealZone").classList.add("hidden");
+      document.getElementById("resetBtn").classList.add("hidden");
+
+      enableChoices(1);
+      enableChoices(2);
+    }
+  </script>
+</body>
+</html>
